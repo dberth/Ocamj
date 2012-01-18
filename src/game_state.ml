@@ -68,6 +68,15 @@ let deal_tiles player nb_tiles =
       let tiles, rest = splitn nb_tiles state.wall_tiles in
       state.player_states.(player).concealed_tiles <- tiles :: state.player_states.(player).concealed_tiles;
       state.wall_tiles <- rest
+
+let deal () =
+  for turn = 0 to 3 do
+    for player = 0 to 3 do
+      let nb_tiles = if turn = 3 then 1 else 4 in
+      deal_tiles player nb_tiles
+    done
+  done;
+  deal_tiles 0 1
       
 
 let hide_tiles = function
