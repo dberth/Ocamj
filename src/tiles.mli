@@ -23,6 +23,8 @@ type basic_tile_descr = tile_descr * int
 
 type tile = int
 
+val max_tile: int
+
 val tile_of_descr: ?instance: int -> tile_descr -> tile
 
 val descr_of_tile: tile -> basic_tile_descr

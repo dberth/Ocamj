@@ -23,6 +23,8 @@ type basic_tile_descr = tile_descr * int
 
 type tile = int
 
+let max_tile = 135
+
 let tile_descrs = Hashtbl.create 136
 
 let tiles =
