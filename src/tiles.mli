@@ -101,3 +101,67 @@ val b90: tile
 val b91: tile
 val b92: tile
 val b93: tile
+val c10: tile
+val c11: tile
+val c12: tile
+val c13: tile
+val c20: tile
+val c21: tile
+val c22: tile
+val c23: tile
+val c30: tile
+val c31: tile
+val c32: tile
+val c33: tile
+val c40: tile
+val c41: tile
+val c42: tile
+val c43: tile
+val c50: tile
+val c51: tile
+val c52: tile
+val c53: tile
+val c60: tile
+val c61: tile
+val c62: tile
+val c63: tile
+val c70: tile
+val c71: tile
+val c72: tile
+val c73: tile
+val c80 : tile
+val c81 : tile
+val c82 : tile
+val c83 : tile
+val c90 : tile
+val c91 : tile
+val c92 : tile
+val c93 : tile
+val wd0 : tile
+val wd1 : tile
+val wd2 : tile
+val wd3 : tile
+val gd0 : tile
+val gd1 : tile
+val gd2 : tile
+val gd3 : tile
+val rd0 : tile
+val rd1 : tile
+val rd2 : tile
+val rd3 : tile
+val ew0 : tile
+val ew1 : tile
+val ew2 : tile
+val ew3 : tile
+val sw0 : tile
+val sw1 : tile
+val sw2 : tile
+val sw3 : tile
+val ww0 : tile
+val ww1 : tile
+val ww2 : tile
+val ww3 : tile
+val nw0 : tile
+val nw1 : tile
+val nw2 : tile
+val nw3 : tile
