@@ -11,16 +11,16 @@ type set =
     {
       tiles: tile list;
       kind: set_kind;
-      concealed: bool;
+      is_concealed: bool;
     }
 
 let build_set ?(concealed = true) tiles kind =
-  {tiles; kind; concealed}
+  {tiles; kind; is_concealed = concealed}
 
 type hand =
     {
      concealed: tile list;
-     known_sets: set list;
+     known: set list;
     }
 
 let pp_set_kind = function
@@ -30,9 +30,9 @@ let pp_set_kind = function
   | Kong -> "K"
   | Other -> "?"
 
-let pp_set {tiles; kind; concealed} =
+let pp_set {tiles; kind; is_concealed} =
   let lpar, rpar =
-    if concealed then "(",")" else "{", "}"
+    if is_concealed then "(",")" else "{", "}"
   in
     Printf.sprintf "%s%s%s%s" (pp_set_kind kind) lpar (String.concat ", " (List.map (pp_tile ~show_instance: true) tiles)) rpar
 
@@ -93,16 +93,20 @@ let chow hand = chow ZList.empty [] hand hand
 
 let set {concealed; known} =
   let open ZList in
-  if is_empty known then
-    interleave [kong hand; pung hand; chow hand] >>= fun (set, concealed) -> return (set, {concealed; known})
-  else
+  match known with
+  | [] ->
+      interleave [kong concealed; pung concealed; chow concealed] >>= fun (set, concealed) -> return (set, {concealed; known})
+  | _ ->
     choose known >>= fun (set, known) -> return (set, {concealed; known})
 
 let pair {concealed; known} =
-  pair concealed >>= fun (pair, concealed) -> pair, {concealed; known}
+  let open ZList in
+  pair concealed >>= fun (pair, concealed) -> return (pair, {concealed; known})
 
 let mahjong hand =
-  let hand = List.sort compare hand in
+  let hand =
+    {hand with concealed = List.sort compare hand.concealed}
+  in
   let open ZList in
     set hand >>= fun (set1, rest) ->
       set rest >>= fun (set2, rest) ->
