@@ -30,47 +30,6 @@ let pp_set {tiles; kind; concealed} =
   in
     Printf.sprintf "%s%s%s%s" (pp_set_kind kind) lpar (String.concat ", " (List.map (pp_tile ~show_instance: true) tiles)) rpar  
 
-let is_same t1 t2 = if t1 < t2 && t1 / 4 = t2 / 4 then ZList.return () else ZList.empty
-
-let can_be_chow  t1 t2 =
-  if t1 < 108 && t2 < 108 then
-    let delta = t2 / 4 - t1 / 4 in 
-    if delta = 1 || delta = 2 then ZList.return () else ZList.empty
-  else
-    ZList.empty
- 
-let is_chow t1 t2 t3 =
-  if t1 < 108 && t2 < 108 && t3 < 108 then
-    if (t2 / 4 - t1 / 4 = 1) && (t3 / 4 - t2 / 4 = 1) then ZList.return () else ZList.empty 
-  else
-    ZList.empty
-
-(*better if tile sorted in decreasing order*)
-
-let pair hand =
-  let open ZList in
-    choose hand >>= fun (t1, rest) -> choose rest >>= fun (t2, rest) ->
-      is_same t1 t2 >> return (build_set [t1; t2] Pair, rest)
-
-let pung hand =
-  let open ZList in
-    choose hand >>= fun (t1, rest) -> choose rest >>= fun (t2, rest) ->
-      is_same t1 t2 >> choose rest >>= fun (t3, rest) ->
-	is_same t2 t3 >> return (build_set [t1; t2; t3] Pung, rest)
-
-let kong hand =
-  let open ZList in
-    choose hand >>= fun (t1, rest) -> choose rest >>= fun (t2, rest) ->
-      is_same t1 t2 >> choose rest >>= fun (t3, rest) ->
-	is_same t2 t3 >> choose rest >>= fun (t4, rest) ->
-          is_same t3 t4 >> return (build_set [t1; t2; t3; t4] Kong, rest)
-
-let chow hand =
-  let open ZList in
-    choose hand >>= fun (t1, rest) -> choose rest >>= fun (t2, rest) ->
-      can_be_chow t1 t2 >> choose rest >>= fun (t3, rest) ->
-	is_chow t1 t2 t3 >> return (build_set [t1; t2; t3] Chow, rest)
-
 let rec calculate_set nb kind acc prec prev = function
   | [] -> acc
   | hd :: tl ->
@@ -102,26 +61,27 @@ let rec chow acc prev hand l =
   match l with
   | [] -> acc
   | hd :: tl ->
-      match prev with
-	| [] -> chow acc [hd] hand tl
-	| hd_prev :: _ ->
-	    begin
-	      if hd / 4 = hd_prev / 4 then
-		chow acc prev hand tl
-	      else if hd / 4 - hd_prev / 4 = 1 then
-		let acc =
-		  match prev with
-		    | [_] -> acc
-		    | prev1 :: prev2 :: _ ->
-			ZList.cons (build_set [prev2; prev1; hd] Chow, List.filter (fun x -> x <> prev1 && x <> prev2 && x <> hd) hand) acc
- 		    | _ -> assert false
- 		in
-		  chow acc (hd :: prev) hand tl
-	      else
-		chow acc [hd] hand tl
-	    end
-
-	      
+      if hd < 108 then
+	match prev with
+	  | [] -> chow acc [hd] hand tl
+	  | hd_prev :: _ ->
+	      begin
+		if hd / 4 = hd_prev / 4 then
+		  chow acc prev hand tl
+		else if hd / 36 = hd_prev / 36 && hd / 4 - hd_prev / 4 = 1 then
+		  let acc =
+		    match prev with
+		      | [_] -> acc
+		      | prev1 :: prev2 :: _ ->
+			  ZList.cons (build_set [prev2; prev1; hd] Chow, List.filter (fun x -> x <> prev1 && x <> prev2 && x <> hd) hand) acc
+ 		      | _ -> assert false
+ 		  in
+		    chow acc (hd :: prev) hand tl
+		else
+		  chow acc [hd] hand tl
+	      end
+      else
+	acc
 
 let chow hand = (*print_endline "Chow";*) let hand = List.sort compare hand in chow ZList.empty [] hand hand
 
