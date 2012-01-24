@@ -3,7 +3,7 @@ open Tiles
 let hand = [d10; d20; d30; d11; d21; d31; d73; d80; d90; d50; d51; d52; d62; d61]
 
 let _ =
-   for i = 1 to 10000 do ignore (ZList.to_list ~limit: 1 (Sets.mahjong hand)) done;
+   for i = 1 to 10_000 do ignore (ZList.to_list ~limit: 1 (Sets.mahjong hand)) done;
   List.iter
     (fun (sets, _) ->
        print_endline (String.concat "; " (List.map Sets.pp_set sets))
