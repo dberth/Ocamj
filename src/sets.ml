@@ -83,7 +83,7 @@ let rec chow acc prev hand l =
       else
 	acc
 
-let chow hand = (*print_endline "Chow";*) let hand = List.sort compare hand in chow ZList.empty [] hand hand
+let chow hand = chow ZList.empty [] hand hand
 
 let set hand =
   let open ZList in
