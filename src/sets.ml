@@ -17,6 +17,12 @@ type set =
 let build_set ?(concealed = true) tiles kind =
   {tiles; kind; concealed}
 
+type hand =
+    {
+     concealed: tile list;
+     known_sets: set list;
+    }
+
 let pp_set_kind = function
   | Pair -> "P2"
   | Chow -> "C"
@@ -28,7 +34,7 @@ let pp_set {tiles; kind; concealed} =
   let lpar, rpar =
     if concealed then "(",")" else "{", "}"
   in
-    Printf.sprintf "%s%s%s%s" (pp_set_kind kind) lpar (String.concat ", " (List.map (pp_tile ~show_instance: true) tiles)) rpar  
+    Printf.sprintf "%s%s%s%s" (pp_set_kind kind) lpar (String.concat ", " (List.map (pp_tile ~show_instance: true) tiles)) rpar
 
 let rec calculate_set nb kind acc prec prev = function
   | [] -> acc
@@ -48,7 +54,7 @@ let rec calculate_set nb kind acc prec prev = function
       in
       calculate_set nb kind acc prec prev tl
 
-let set_same nb kind hand = (*print_endline "Same";*) calculate_set nb kind ZList.empty [] [] hand
+let set_same nb kind hand = calculate_set nb kind ZList.empty [] [] hand
 
 let pair hand = set_same 2 Pair hand
 
@@ -85,15 +91,23 @@ let rec chow acc prev hand l =
 
 let chow hand = chow ZList.empty [] hand hand
 
-let set hand =
+let set {concealed; known} =
   let open ZList in
-    interleave [kong hand; pung hand; chow hand]
-      
+  if is_empty known then
+    interleave [kong hand; pung hand; chow hand] >>= fun (set, concealed) -> return (set, {concealed; known})
+  else
+    choose known >>= fun (set, known) -> return (set, {concealed; known})
+
+let pair {concealed; known} =
+  pair concealed >>= fun (pair, concealed) -> pair, {concealed; known}
+
 let mahjong hand =
   let hand = List.sort compare hand in
   let open ZList in
-    set hand >>= fun (set1, rest) -> (*print_endline (Printf.sprintf "==== set 1: %s" (pp_set set1));*) set rest >>= fun (set2, rest) ->
-      ((*print_endline (Printf.sprintf "==== set 2: %s %s" (pp_set set1) (pp_set set2));*) set rest ) >>= fun (set3, rest) ->
-      ((*print_endline (Printf.sprintf "==== set 3: %s %s %s %s" (pp_set set1)  (pp_set set2) (pp_set set3) (String.concat "; " (List.map string_of_int rest)));*) set rest ) >>= fun (set4, rest) ->
-      ((*print_endline (Printf.sprintf "==== set 4: %s %s %s %s" (pp_set set1) (pp_set set2) (pp_set set3) (pp_set set4));*) pair rest ) >>= fun (pair, rest) -> (*print_endline "OK";*) return ([set1; set2; set3; set4; pair], rest)
-	    
+    set hand >>= fun (set1, rest) ->
+      set rest >>= fun (set2, rest) ->
+        set rest >>= fun (set3, rest) ->
+          set rest >>= fun (set4, rest) ->
+            pair rest >>= fun (pair, rest) ->
+              return ([set1; set2; set3; set4; pair], rest)
+

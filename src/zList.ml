@@ -5,6 +5,11 @@ and 'a t = 'a _zlist Lazy.t
 
 let empty = lazy Null
 
+let is_empty l =
+  match Lazy.force l with
+  | Null -> true
+  | _ -> false
+
 let cons x l = lazy (Cons(x, l))
 
 let return x = cons x empty
@@ -39,7 +44,7 @@ let rec bind_ zl f current_results =
         match zl with
           | Null -> empty
           | Cons (hd, tl) -> bind_ (Lazy.force tl) f (f hd)
-	      
+
 let bind zl f = bind_ (Lazy.force zl) (fun x -> Lazy.force (f x)) Null
 
 let (>>=) = bind
