@@ -1,1 +1,1 @@
-<*.ml> or <*.mli> or "monad.byte" or "mj.byte": package(lwt)
+<*.ml> or <*.mli> or "monad.byte" or "game_state.byte" or "mj.byte": package(lwt)

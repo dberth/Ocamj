@@ -6,8 +6,8 @@ type player_state =
     {
      wind: Tiles.wind;
      mutable concealed_tiles: concealed_tiles;
-     known_sets: Sets.set list;
-     discarded_tiles: Tiles.tile list;
+     mutable known_sets: Sets.set list;
+     mutable discarded_tiles: Tiles.tile list;
    }
 
 type t =
@@ -17,8 +17,6 @@ type t =
      mutable current_turn: int;
    }
 
-val new_game: unit -> unit
-
-val deal: unit -> unit
+val new_game_state: unit -> t
 
 val state_for_player: int -> t
