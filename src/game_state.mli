@@ -14,5 +14,7 @@ type t =
     {
      player_states: player_state array;
      mutable wall_tiles: concealed_tiles;
+     mutable current_discard: Tiles.tile option;
      mutable current_turn: int;
+     mutable current_player: int;
    }

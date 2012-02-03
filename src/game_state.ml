@@ -14,6 +14,7 @@ type t =
     {
      player_states: player_state array;
      mutable wall_tiles: concealed_tiles;
+     mutable current_discard: Tiles.tile option;
      mutable current_turn: int;
      mutable current_player: int;
    }
@@ -52,6 +53,8 @@ let new_game_state () =
    player_states = Array.init 4 (fun i -> new_player_state (init_wind_of_player i));
    wall_tiles = Visible tiles;
    current_turn = 0;
+   current_discard = None;
+   current_player = 0;
  }
 
 let splitn n l =
@@ -106,7 +109,10 @@ let update_current_turn f =
   update (fun state -> state.current_turn <- f state.current_turn)
 
 let update_current_player f =
-  update (fun state -W state.current_player <- f state.current_player)
+  update (fun state -> state.current_player <- f state.current_player)
+
+let update_current_discard f =
+  update (fun state -> state.current_discard)
 
 let deal_tiles player nb_tiles =
   let open GStM.Op in
@@ -119,7 +125,7 @@ let deal =
   let open GStM.Op in
   let rec aux turn player =
     let next_turn, next_player = turn + ((player + 1) / 4), (player + 1) mod 4 in
-    if turn = 4 then deal_tiles 0 1 else
+    if turn = 4 then GSt.return () else
     let nb_tiles = if turn = 3 then 1 else 4 in
     deal_tiles player nb_tiles >> aux next_turn next_player 
   in
@@ -160,18 +166,33 @@ let hide_player_hand player_state =
    concealed_tiles = hide_tiles player_state.concealed_tiles
  }
 
-let state_for_player player {player_states; wall_tiles; current_turn; current_player} =
+let state_for_player player {player_states; wall_tiles; current_turn; current_player; current_discard} =
   {
    player_states = Array.init 4 (fun i -> if i = player then player_states.(i) else hide_player_hand player_states.(i));
    wall_tiles = hide_tiles wall_tiles;
    current_turn;
    current_player;
+   current_discard;
  }
-  
+
+type player_action_on_turn =
+  | T_mahjong of Sets.hand
+  | T_kong of Sets.set
+  | T_discard of Tiles.tile
+  | T_quit
+
+type players_action_on_discard =
+  | D_mahjong of Sets.hand
+  | D_kong of Sets.set
+  | D_pung of Sets.set
+  | D_show of Sets.set
+  | D_quit
+    
 module type GAME =
     sig
-      val notify_state_to_player: t -> unit Lwt.t
+      val notify_state_to_player: int -> t -> unit Lwt.t
       val player_action_on_turn: player_action_on_turn Lwt.t
+      val players_action_on_discard: (int * players_action_on_discard) option Lwt.t
     end
 
 module Make(Gi: GAME) =
@@ -181,27 +202,42 @@ module Make(Gi: GAME) =
       Lwt.join
 	(List.map
 	   (fun player ->
-	     Gi.notify_state_to_player (state_for_player player state)
+	     Gi.notify_state_to_player player (state_for_player player state)
 	   )
 	   [0; 1; 2; 3]
 	)
 
+    let get_and_notify_state =
+      let open GStM.Op in
+      GSt.get >>= fun state -> GSt.lift (notify_state_to_players state) >> GSt.return state
 	
-    let rec game_loop =
+    let rec game_loop () =
+      let open GStM.Op in
       GSt.get >>= fun state ->
+	deal_tiles (state.current_player) 1 >>
 	GSt.lift (notify_state_to_players state) >>
-	Gi.player_action_on_turn >>= fun action ->
+	GSt.lift Gi.player_action_on_turn >>= fun action ->
 	  match action with
-	  | `Mahjong hand -> handle_mahjong hand
-	  | `Kong set -> handle_concealed_kong set
-	  | `Discard tile -> handle_discard tile
-	  | `Quit -> handle_quit
+	  | T_discard tile -> handle_discard tile
+	  | _ -> assert false
 
     and handle_discard tile =
-      
+      let open GStM.Op in
+      GSt.get >>= fun state ->
+	update_current_discard (fun _ -> Some tile) >>
+	update_player_concealed_tiles (fun tiles -> List.filter (fun x -> x <> tile) tiles) state.current_player >>
+	GSt.lift (notify_state_to_players state) >>
+	GSt.lift Gi.players_action_on_discard >>= fun action ->
+	  match action with
+	  | None ->
+	      update_player_discarded_tiles (fun tiles -> tile :: tiles) state.current_player >>
+	      update_current_discard (fun _ -> None) >>
+	      update_current_player (fun player -> (succ player) mod 4) >>
+	      GSt.lift (notify_state_to_players state) >> game_loop ()
+	  | Some (player, action) -> assert false
+	  
 
     let run () =
-      GSt.run (new_game_state ()) >>
-      deal >>
-      game_loop
+      let open GStM.Op in
+      GSt.run (deal >> game_loop ()) (new_game_state ())
   end
