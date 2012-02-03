@@ -117,9 +117,12 @@ let update_current_discard f =
 let deal_tiles player nb_tiles =
   let open GStM.Op in
   get_wall_tiles >>= fun wall_tiles ->
-    let tiles, rest = splitn nb_tiles wall_tiles in
-    update_player_concealed_tiles (fun concealed_tiles -> tiles @ concealed_tiles) player >>
-    update_wall_tiles (fun _ -> rest)
+    try
+      let tiles, rest = splitn nb_tiles wall_tiles in
+      update_player_concealed_tiles (fun concealed_tiles -> tiles @ concealed_tiles) player >>
+      update_wall_tiles (fun _ -> rest) >> GSt.return true
+    with
+    | Failure _ -> GSt.return false
 
 let deal =
   let open GStM.Op in
@@ -130,32 +133,6 @@ let deal =
     deal_tiles player nb_tiles >> aux next_turn next_player 
   in
   aux 0 0
-
-(* let deal_tiles player nb_tiles = *)
-(*   match !current_game_state with *)
-(*   | None -> assert false *)
-(*   | Some state -> *)
-(*       match state.wall_tiles with *)
-(*       | Visible wall_tiles -> *)
-(* 	  let tiles, rest = splitn nb_tiles wall_tiles in *)
-(* 	  begin *)
-(* 	    match state.player_states.(player).concealed_tiles with *)
-(* 	    | Visible concealed_tiles -> *)
-(* 		state.player_states.(player).concealed_tiles <- Visible (tiles @ concealed_tiles); *)
-(* 		state.wall_tiles <- Visible rest *)
-(* 	    | Hidden _ -> assert false *)
-(* 	  end *)
-(*       | Hidden _ -> assert false *)
-
-(* let deal () = *)
-(*   for turn = 0 to 3 do *)
-(*     for player = 0 to 3 do *)
-(*       let nb_tiles = if turn = 3 then 1 else 4 in *)
-(*       deal_tiles player nb_tiles *)
-(*     done *)
-(*   done; *)
-(*   deal_tiles 0 1 *)
-      
 
 let hide_tiles = function
   | Visible tiles -> Hidden (List.length tiles)
@@ -193,6 +170,7 @@ module type GAME =
       val notify_state_to_player: int -> t -> unit Lwt.t
       val player_action_on_turn: player_action_on_turn Lwt.t
       val players_action_on_discard: (int * players_action_on_discard) option Lwt.t
+      val end_of_game_no_more_tiles: unit Lwt.t
     end
 
 module Make(Gi: GAME) =
@@ -214,12 +192,16 @@ module Make(Gi: GAME) =
     let rec game_loop () =
       let open GStM.Op in
       GSt.get >>= fun state ->
-	deal_tiles (state.current_player) 1 >>
-	GSt.lift (notify_state_to_players state) >>
-	GSt.lift Gi.player_action_on_turn >>= fun action ->
-	  match action with
-	  | T_discard tile -> handle_discard tile
-	  | _ -> assert false
+	deal_tiles (state.current_player) 1 >>= fun continue ->
+	  if continue then
+	    GSt.lift (notify_state_to_players state) >>
+	    GSt.lift Gi.player_action_on_turn >>= fun action ->
+	      match action with
+	      | T_discard tile -> handle_discard tile
+	      | T_kong set -> handle_concealed_kong_declaration set
+	      | _ -> assert false
+	  else
+	    GSt.lift Gi.end_of_game_no_more_tiles
 
     and handle_discard tile =
       let open GStM.Op in
@@ -235,7 +217,13 @@ module Make(Gi: GAME) =
 	      update_current_player (fun player -> (succ player) mod 4) >>
 	      GSt.lift (notify_state_to_players state) >> game_loop ()
 	  | Some (player, action) -> assert false
-	  
+
+    and handle_concealed_kong_declaration set =
+      let open GStM.Op in
+      GSt.get >>= fun state ->
+	update_player_known_sets (fun known_sets -> set :: known_sets) state.current_player >>
+	update_player_concealed_tiles (fun tiles -> List.filter (fun tile -> not (List.mem tile set.Sets.tiles)) tiles) state.current_player >>
+	GSt.lift (notify_state_to_players state) >> game_loop ()
 
     let run () =
       let open GStM.Op in
