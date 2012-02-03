@@ -16,7 +16,3 @@ type t =
      mutable wall_tiles: concealed_tiles;
      mutable current_turn: int;
    }
-
-val new_game_state: unit -> t
-
-val state_for_player: int -> t

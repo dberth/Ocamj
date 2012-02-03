@@ -15,6 +15,7 @@ type t =
      player_states: player_state array;
      mutable wall_tiles: concealed_tiles;
      mutable current_turn: int;
+     mutable current_player: int;
    }
 
 let current_game_state = ref None
@@ -102,7 +103,10 @@ let get_wall_tiles =
     | Hidden _ -> assert false
 
 let update_current_turn f =
-  update (fun state -> state.current_turn <- f (state.current_turn))
+  update (fun state -> state.current_turn <- f state.current_turn)
+
+let update_current_player f =
+  update (fun state -W state.current_player <- f state.current_player)
 
 let deal_tiles player nb_tiles =
   let open GStM.Op in
@@ -156,14 +160,48 @@ let hide_player_hand player_state =
    concealed_tiles = hide_tiles player_state.concealed_tiles
  }
 
-let state_for_player_ player {player_states; wall_tiles; current_turn} =
+let state_for_player player {player_states; wall_tiles; current_turn; current_player} =
   {
    player_states = Array.init 4 (fun i -> if i = player then player_states.(i) else hide_player_hand player_states.(i));
    wall_tiles = hide_tiles wall_tiles;
    current_turn;
+   current_player;
  }
   
-let state_for_player player =
-  match !current_game_state with
-  | None -> assert false
-  | Some state -> state_for_player_ player state
+module type GAME =
+    sig
+      val notify_state_to_player: t -> unit Lwt.t
+      val player_action_on_turn: player_action_on_turn Lwt.t
+    end
+
+module Make(Gi: GAME) =
+  struct
+
+    let notify_state_to_players state =
+      Lwt.join
+	(List.map
+	   (fun player ->
+	     Gi.notify_state_to_player (state_for_player player state)
+	   )
+	   [0; 1; 2; 3]
+	)
+
+	
+    let rec game_loop =
+      GSt.get >>= fun state ->
+	GSt.lift (notify_state_to_players state) >>
+	Gi.player_action_on_turn >>= fun action ->
+	  match action with
+	  | `Mahjong hand -> handle_mahjong hand
+	  | `Kong set -> handle_concealed_kong set
+	  | `Discard tile -> handle_discard tile
+	  | `Quit -> handle_quit
+
+    and handle_discard tile =
+      
+
+    let run () =
+      GSt.run (new_game_state ()) >>
+      deal >>
+      game_loop
+  end
