@@ -153,7 +153,7 @@ let state_for_player player {player_states; wall_tiles; current_turn; current_pl
  }
 
 type player_action_on_turn =
-  | T_mahjong of Sets.hand
+  | T_mahjong
   | T_kong of Sets.set
   | T_discard of Tiles.tile
   | T_quit
@@ -171,6 +171,8 @@ module type GAME =
       val player_action_on_turn: player_action_on_turn Lwt.t
       val players_action_on_discard: (int * players_action_on_discard) option Lwt.t
       val end_of_game_no_more_tiles: unit Lwt.t
+      val notify_winner: int -> unit Lwt.t
+      val notify_player_retire: int -> unit Lwt.t
     end
 
 module Make(Gi: GAME) =
@@ -199,7 +201,8 @@ module Make(Gi: GAME) =
 	      match action with
 	      | T_discard tile -> handle_discard tile
 	      | T_kong set -> handle_concealed_kong_declaration set
-	      | _ -> assert false
+	      | T_mahjong -> handle_mahjong_on_turn
+	      | T_quit -> handle_quit
 	  else
 	    GSt.lift Gi.end_of_game_no_more_tiles
 
@@ -224,6 +227,17 @@ module Make(Gi: GAME) =
 	update_player_known_sets (fun known_sets -> set :: known_sets) state.current_player >>
 	update_player_concealed_tiles (fun tiles -> List.filter (fun tile -> not (List.mem tile set.Sets.tiles)) tiles) state.current_player >>
 	GSt.lift (notify_state_to_players state) >> game_loop ()
+
+    and handle_mahjong_on_turn =
+      let open GStM.Op in
+      GSt.get >>= fun state ->
+	GSt.lift (Gi.notify_winner state.current_player)
+
+    and handle_quit =
+      let open GStM.Op in
+      GSt.get >>= fun state ->
+	GSt.lift (Gi.notify_player_retire state.current_player)
+      
 
     let run () =
       let open GStM.Op in
