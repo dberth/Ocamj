@@ -50,3 +50,13 @@ module State: functor (S: sig type t end) ->
     val eval: 'a m -> S.t -> 'a
     val run: 'a m -> S.t -> S.t
   end
+
+module Lwt_state: functor (S: sig type t end) ->
+  sig
+    include MONAD
+
+    val get: S.t option m
+    val set: S.t option -> unit m
+
+    val run: 'a m -> S.t option -> 'a Lwt.t
+  end
