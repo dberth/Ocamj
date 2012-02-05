@@ -1,8 +1,8 @@
 module type MONAD =
   sig
-    type 'a m
-    val return: 'a -> 'a m
-    val bind: 'a m -> ('a -> 'b m) -> 'b m
+    type 'a t
+    val return: 'a -> 'a t
+    val bind: 'a t -> ('a -> 'b t) -> 'b t
   end
 
 module Monad(M: MONAD) =
@@ -47,7 +47,7 @@ module Monad(M: MONAD) =
 
 module State(S: sig type t end) =
   struct
-    type 'a m = St of (S.t -> 'a * S.t)
+    type 'a t = St of (S.t -> 'a * S.t)
 
     let return x = St(fun st -> x, st)
 
@@ -67,9 +67,29 @@ module State(S: sig type t end) =
     let run (St m) st = snd (m st)
   end
 
+module StateT(S: sig type t end)(M: MONAD) =
+  struct
+    type 'a t = St of (S.t -> ('a * S.t) M.t)
+
+    let return x = St(fun st -> M.return (x, st))
+
+    let bind (St m) f =
+      St (fun st -> M.bind (m st) (fun (x, st') -> let St m' = f x in m' st'))
+
+    let lift m = St (fun st -> M.bind m (fun x -> M.return (x, st)))
+
+    let get = St (fun st -> M.return(st,st))
+
+    let set st = St (fun _ -> M.return((), st))
+
+    let eval (St m) st = M.bind (m st) (fun (x, _) -> M.return x)
+
+    let run (St m) st = M.bind (m st) (fun (_, st) -> M.return st)
+  end
+
 module Lwt_state(S: sig type t end) =
   struct
-    type 'a m = St of (S.t option ->'a Lwt.t)
+    type 'a t = St of (S.t option ->'a Lwt.t)
 
     let state = Lwt.new_key ()
 
